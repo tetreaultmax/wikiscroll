@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>WikiScroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12151c;
+    --ink-2:#191d26;
+    --parchment:#f2e9d6;
+    --parchment-dim:#d8cdb2;
+    --brass:#c9a227;
+    --brass-dim:#8c7a4a;
+    --rose:#b4544a;
+    --line: rgba(242,233,214,0.16);
+    --content-w: 640px;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; min-height:100%; background:var(--ink);
+    font-family:'Source Serif 4', serif; color:var(--parchment);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; letter-spacing:.04em; }
+
+  /* grain overlay */
+  #grain{
+    position:fixed; inset:0; pointer-events:none; z-index:50;
+    opacity:.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* top bar: sticky, not overlaying content */
+  #topbar{
+    position:sticky; top:0; left:0; right:0; z-index:40;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 14px;
+    background:rgba(18,21,28,.92); backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  #brand-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  #brand{ display:flex; align-items:baseline; gap:8px; }
+  #brand .mark{ font-family:'Fraunces', serif; font-weight:700; font-size:20px; color:var(--parchment); }
+  #brand .sub{ font-size:10px; color:var(--brass-dim); text-transform:uppercase; }
+
+  /* language switch */
+  #langswitch{
+    display:flex; flex:0 0 auto; border:1px solid var(--line); border-radius:999px;
+    overflow:hidden; font-size:11px;
+  }
+  #langswitch button{
+    padding:6px 12px; border:none; background:transparent; color:var(--parchment-dim);
+    cursor:pointer; font-family:'IBM Plex Mono', monospace; letter-spacing:.04em;
+    touch-action:manipulation;
+  }
+  #langswitch button.active{ background:var(--brass); color:#1a1204; font-weight:600; }
+
+  #chips{
+    display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px;
+    -webkit-overflow-scrolling:touch; touch-action:pan-x;
+  }
+  #chips::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex:0 0 auto; padding:9px 15px; border-radius:999px;
+    border:1px solid var(--line); background:rgba(242,233,214,0.03);
+    color:var(--parchment-dim); font-size:12.5px; cursor:pointer;
+    white-space:nowrap; transition:all .2s ease;
+  }
+  .chip.active{
+    background:var(--brass); border-color:var(--brass); color:#1a1204; font-weight:600;
+  }
+
+  /* feed: normal document flow, no snap, no fullscreen */
+  #feed{
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px calc(60px + env(safe-area-inset-bottom));
+    gap:34px;
+  }
+
+  .entry{
+    width:100%; max-width: var(--content-w);
+  }
+
+  /* image, capped to the same width as the text */
+  .media{
+    position:relative; width:100%; aspect-ratio:4/3; overflow:hidden;
+    border-radius:6px 6px 0 0; background:var(--ink-2);
+  }
+  .media .bg{
+    position:absolute; inset:0; background-size:cover; background-position:center;
+    filter:saturate(.92) brightness(.86);
+  }
+  .media .bg.noimg{
+    background:
+      radial-gradient(circle at 30% 20%, rgba(201,162,39,.18), transparent 55%),
+      repeating-linear-gradient(135deg, rgba(242,233,214,.04) 0 2px, transparent 2px 22px),
+      var(--ink-2);
+  }
+  .catalog-tag{
+    position:absolute; top:10px; right:10px; z-index:5;
+    font-size:10.5px; color:var(--brass); background:rgba(18,21,28,.6);
+    border:1px solid var(--line); padding:4px 9px; border-radius:3px;
+    transform:rotate(2deg);
+  }
+
+  /* text panel, same width as image, fused underneath it like a photo glued to an index card */
+  .content{
+    position:relative; z-index:2; width:100%;
+    background:var(--parchment); color:#1a1a12;
+    padding:18px 20px 20px;
+    border-radius:0 0 6px 6px;
+    border-top:2px dashed rgba(26,26,18,.22);
+    box-shadow: 0 10px 22px rgba(0,0,0,.35);
+  }
+  .eyebrow{
+    font-size:10.5px; text-transform:uppercase; color:var(--brass-dim);
+    margin:0 0 8px; letter-spacing:.08em;
+  }
+  .title{
+    font-family:'Fraunces', serif; font-weight:700; font-size:clamp(21px, 5.4vw, 27px); line-height:1.14;
+    margin:0 0 10px; letter-spacing:-.01em;
+  }
+  .extract{
+    font-size:15.5px; line-height:1.58; margin:0; color:#2b2818;
+  }
+  .meta-row{
+    display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap;
+  }
+  .read-link{
+    font-size:12.5px; color:var(--rose); text-decoration:none; border-bottom:1px solid currentColor;
+    font-weight:600;
+  }
+  .read-time{ font-size:11.5px; color:var(--brass-dim); }
+
+  /* action row, in-flow under the text instead of a floating rail */
+  .actions{
+    display:flex; gap:8px; margin-top:16px; padding-top:14px;
+    border-top:1px solid rgba(26,26,18,.14);
+  }
+  .actions button{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:9px 8px; border-radius:5px; border:1px solid rgba(26,26,18,.18);
+    background:transparent; color:#1a1a12; font-size:12px; cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    touch-action:manipulation;
+  }
+  .actions button:active{ transform:scale(.96); }
+
+  /* loading placeholder */
+  .loading-card{
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px;
+    color:var(--brass-dim); font-size:12px; padding:60px 0;
+  }
+  .spinner{
+    width:22px; height:22px; border-radius:50%; border:2px solid var(--line);
+    border-top-color:var(--brass); animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  #sentinel{ height:1px; width:100%; }
+
+  /* toast */
+  #toast{
+    position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:var(--parchment); color:#1a1a12; padding:9px 16px; border-radius:4px;
+    font-size:12.5px; z-index:60; opacity:0; pointer-events:none; transition:all .25s ease;
+    max-width:86vw; text-align:center;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="grain"></div>
+
+<div id="topbar">
+  <div id="brand-row">
+    <div id="brand">
+      <span class="mark">WikiScroll</span>
+      <span class="sub mono" id="brand-sub">the encyclopedic randomizer</span>
+    </div>
+    <div id="langswitch" class="mono">
+      <button data-lang="fr" class="active">FR</button>
+      <button data-lang="en">EN</button>
+    </div>
+  </div>
+  <div id="chips" class="mono"></div>
+</div>
+
+<div id="feed"></div>
+<div id="sentinel"></div>
+<div id="toast"></div>
+
+<script>
+(function(){
+  const STRINGS = {
+    fr: {
+      sub: 'le hasard encyclopédique',
+      loading: 'chargement de la fiche…',
+      notFound: 'aucune fiche trouvée, réessayez',
+      readLink: "Lire l'article entier",
+      readTime: n => n + ' min de lecture',
+      reroll: '⟳ Autre',
+      share: '↗ Copier',
+      copied: 'Lien copié',
+    },
+    en: {
+      sub: 'the encyclopedic randomizer',
+      loading: 'loading entry…',
+      notFound: 'no entry found, try again',
+      readLink: 'Read the full article',
+      readTime: n => n + ' min read',
+      reroll: '⟳ Another',
+      share: '↗ Copy',
+      copied: 'Link copied',
+    }
+  };
+
+  const TOPICS = [
+    { fr:'Aléatoire', en:'Random',      q:{ fr:null, en:null } },
+    { fr:'Science',   en:'Science',     q:{ fr:'science', en:'science' } },
+    { fr:'Histoire',  en:'History',     q:{ fr:'histoire', en:'history' } },
+    { fr:'Art',       en:'Art',         q:{ fr:'art peinture sculpture', en:'art painting sculpture' } },
+    { fr:'Géographie',en:'Geography',   q:{ fr:'géographie ville pays', en:'geography city country' } },
+    { fr:'Nature',    en:'Nature',      q:{ fr:'nature animal espèce', en:'nature animal species' } },
+    { fr:'Techno',    en:'Tech',        q:{ fr:'technologie informatique', en:'technology computing' } },
+    { fr:'Musique',   en:'Music',       q:{ fr:'musique', en:'music' } },
+    { fr:'Cinéma',    en:'Film',        q:{ fr:'cinéma film', en:'cinema film' } },
+    { fr:'Philosophie',en:'Philosophy', q:{ fr:'philosophie', en:'philosophy' } },
+    { fr:'Sport',     en:'Sport',       q:{ fr:'sport', en:'sport' } },
+  ];
+
+  const feedEl = document.getElementById('feed');
+  const chipsEl = document.getElementById('chips');
+  const sentinelEl = document.getElementById('sentinel');
+  const toastEl = document.getElementById('toast');
+  const brandSubEl = document.getElementById('brand-sub');
+  const langBtns = document.querySelectorAll('#langswitch button');
+
+  let LANG = 'fr';
+  let currentTopic = TOPICS[0];
+  let seen = new Set();
+  let loadingMore = false;
+  let requestToken = 0;
+
+  function t(){ return STRINGS[LANG]; }
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toastEl.classList.remove('show'), 1600);
+  }
+
+  function readTimeStr(article){
+    const words = article._wordCount || (article.extract||'').split(/\s+/).filter(Boolean).length;
+    return t().readTime(Math.max(1, Math.round(words/200)));
+  }
+
+  async function fetchJSON(url){
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('http '+res.status);
+    return res.json();
+  }
+
+  async function fetchRandomSummary(){
+    return fetchJSON(`https://${LANG}.wikipedia.org/api/rest_v1/page/random/summary`);
+  }
+
+  async function fetchSummaryFor(title){
+    return fetchJSON(`https://${LANG}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+  }
+
+  async function fetchWordCount(title){
+    try{
+      const url = `https://${LANG}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exlimit=1&titles=${encodeURIComponent(title)}&format=json&formatversion=2&origin=*`;
+      const data = await fetchJSON(url);
+      const page = data.query && data.query.pages && data.query.pages[0];
+      const text = page ? page.extract : '';
+      const words = (text||'').split(/\s+/).filter(Boolean).length;
+      return words || null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  async function fetchByTopic(q){
+    const offset = Math.floor(Math.random()*180);
+    const url = `https://${LANG}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*&srlimit=25&sroffset=${offset}&srnamespace=0`;
+    const data = await fetchJSON(url);
+    const results = (data.query && data.query.search) || [];
+    if(!results.length) return fetchRandomSummary();
+    const pick = results[Math.floor(Math.random()*results.length)];
+    return fetchSummaryFor(pick.title);
+  }
+
+  async function getNextArticle(){
+    for(let attempt=0; attempt<6; attempt++){
+      try{
+        const q = currentTopic.q[LANG];
+        const summary = q ? await fetchByTopic(q) : await fetchRandomSummary();
+        if(!summary || summary.type === 'disambiguation') continue;
+        if(!summary.extract || summary.extract.length < 40) continue;
+        if(seen.has(summary.pageid)) continue;
+        seen.add(summary.pageid);
+        summary._wordCount = await fetchWordCount(summary.title);
+        return summary;
+      }catch(e){ /* retry */ }
+    }
+    return null;
+  }
+
+  function catalogNumber(pageid){
+    return 'N° ' + String(pageid).padStart(6,'0');
+  }
+
+  function buildEntry(article){
+    const entry = document.createElement('article');
+    entry.className = 'entry';
+
+    if(!article){
+      entry.innerHTML = `<div class="loading-card"><div class="spinner"></div><div class="mono">${t().loading}</div></div>`;
+      return entry;
+    }
+
+    const img = article.thumbnail ? article.thumbnail.source :
+                (article.originalimage ? article.originalimage.source : null);
+    const pageUrl = (article.content_urls && article.content_urls.desktop && article.content_urls.desktop.page)
+                    || `https://${LANG}.wikipedia.org/?curid=${article.pageid}`;
+    const desc = article.description ? article.description : (currentTopic[LANG]);
+
+    entry.innerHTML = `
+      <div class="media">
+        <div class="bg ${img ? '' : 'noimg'}" ${img ? `style="background-image:url('${img}')"` : ''}></div>
+        <div class="catalog-tag mono">${catalogNumber(article.pageid)}</div>
+      </div>
+      <div class="content">
+        <p class="eyebrow mono">${desc} · ${LANG.toUpperCase()}</p>
+        <h2 class="title">${article.title}</h2>
+        <p class="extract">${article.extract}</p>
+        <div class="meta-row">
+          <a class="read-link" href="${pageUrl}" target="_blank" rel="noopener">${t().readLink}</a>
+          <span class="read-time mono">${readTimeStr(article)}</span>
+        </div>
+        <div class="actions">
+          <button class="reroll-btn">${t().reroll}</button>
+          <button class="share-btn">${t().share}</button>
+        </div>
+      </div>
+    `;
+
+    entry.querySelector('.reroll-btn').addEventListener('click', async (e)=>{
+      const btn = e.currentTarget;
+      btn.style.opacity = '.4';
+      const fresh = await getNextArticle();
+      btn.style.opacity = '1';
+      if(fresh){
+        const fresh2 = buildEntry(fresh);
+        entry.replaceWith(fresh2);
+      }
+    });
+
+    entry.querySelector('.share-btn').addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(pageUrl);
+        showToast(t().copied);
+      }catch(e){ showToast(pageUrl); }
+    });
+
+    return entry;
+  }
+
+  async function appendNext(){
+    if(loadingMore) return;
+    loadingMore = true;
+    const myToken = requestToken;
+    const placeholder = buildEntry(null);
+    feedEl.appendChild(placeholder);
+
+    const article = await getNextArticle();
+    if(myToken !== requestToken){ loadingMore = false; return; }
+
+    if(article){
+      placeholder.replaceWith(buildEntry(article));
+    } else {
+      placeholder.querySelector('.mono').textContent = t().notFound;
+    }
+    loadingMore = false;
+  }
+
+  async function resetFeed(){
+    requestToken++;
+    seen = new Set();
+    feedEl.innerHTML = '';
+    window.scrollTo({ top: 0 });
+    for(let i=0;i<3;i++){ await appendNext(); }
+  }
+
+  function renderChips(){
+    chipsEl.innerHTML = '';
+    TOPICS.forEach(topic=>{
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (topic===currentTopic ? ' active' : '');
+      chip.textContent = topic[LANG];
+      chip.addEventListener('click', ()=>{
+        if(topic === currentTopic) return;
+        currentTopic = topic;
+        renderChips();
+        resetFeed();
+      });
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  langBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const lang = btn.dataset.lang;
+      if(lang === LANG) return;
+      LANG = lang;
+      langBtns.forEach(b=>b.classList.toggle('active', b===btn));
+      document.documentElement.lang = LANG;
+      brandSubEl.textContent = t().sub;
+      renderChips();
+      resetFeed();
+    });
+  });
+
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting) appendNext();
+    });
+  }, { rootMargin: '600px 0px 600px 0px' });
+  io.observe(sentinelEl);
+
+  renderChips();
+  resetFeed();
+})();
+</script>
+</body>
+</html>
