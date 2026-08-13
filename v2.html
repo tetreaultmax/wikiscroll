@@ -1,0 +1,2640 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<title>WikiScroll</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+
+:root{
+  --ink:#12151c;
+  --ink-2:#191d26;
+  --parchment:#f2e9d6;
+  --parchment-dim:#d8cdb2;
+  --brass:#c9a227;
+  --brass-dim:#8c7a4a;
+  --rose:#b4544a;
+  --line:rgba(242,233,214,0.16);
+
+  --topbar-height:118px;
+}
+
+
+/* =========================================================
+   GLOBAL
+========================================================= */
+
+*{
+  box-sizing:border-box;
+}
+
+html,
+body{
+  margin:0;
+  padding:0;
+
+  width:100%;
+  height:100%;
+
+  overflow:hidden;
+
+  background:var(--ink);
+
+  font-family:'Source Serif 4', serif;
+  color:var(--parchment);
+
+  -webkit-tap-highlight-color:transparent;
+}
+
+
+/* =========================================================
+   GRAIN
+========================================================= */
+
+#grain{
+  position:fixed;
+  inset:0;
+
+  pointer-events:none;
+
+  z-index:100;
+
+  opacity:.05;
+
+  mix-blend-mode:overlay;
+
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.mono{
+  font-family:'IBM Plex Mono', monospace;
+  letter-spacing:.04em;
+}
+
+
+/* =========================================================
+   TOP BAR
+========================================================= */
+
+#topbar{
+
+  position:fixed;
+
+  top:0;
+  left:0;
+  right:0;
+
+  z-index:80;
+
+  padding:
+    calc(12px + env(safe-area-inset-top))
+    16px
+    12px;
+
+  background:rgba(18,21,28,.92);
+
+  backdrop-filter:blur(10px);
+
+  border-bottom:1px solid var(--line);
+
+  display:flex;
+  flex-direction:column;
+
+  gap:8px;
+}
+
+
+#brand-row{
+
+  display:flex;
+
+  align-items:center;
+  justify-content:space-between;
+
+  gap:10px;
+}
+
+
+#brand{
+
+  display:flex;
+
+  align-items:baseline;
+
+  gap:8px;
+
+  min-width:0;
+}
+
+
+#brand .mark{
+
+  font-family:'Fraunces', serif;
+
+  font-weight:700;
+
+  font-size:20px;
+
+  color:var(--parchment);
+
+  white-space:nowrap;
+}
+
+
+#brand .sub{
+
+  font-size:10px;
+
+  color:var(--brass-dim);
+
+  text-transform:uppercase;
+
+  white-space:nowrap;
+}
+
+
+/* =========================================================
+   LANGUAGE
+========================================================= */
+
+#langswitch{
+
+  display:flex;
+
+  flex:0 0 auto;
+
+  border:1px solid var(--line);
+
+  border-radius:999px;
+
+  overflow:hidden;
+
+  font-size:11px;
+}
+
+
+#langswitch button{
+
+  padding:6px 12px;
+
+  border:none;
+
+  background:transparent;
+
+  color:var(--parchment-dim);
+
+  cursor:pointer;
+
+  font-family:'IBM Plex Mono', monospace;
+
+  letter-spacing:.04em;
+
+  touch-action:manipulation;
+}
+
+
+#langswitch button.active{
+
+  background:var(--brass);
+
+  color:#1a1204;
+
+  font-weight:600;
+}
+
+
+/* =========================================================
+   TOPIC CHIPS
+========================================================= */
+
+#chips{
+
+  display:flex;
+
+  gap:8px;
+
+  overflow-x:auto;
+
+  scrollbar-width:none;
+
+  padding-bottom:2px;
+
+  -webkit-overflow-scrolling:touch;
+
+  touch-action:pan-x;
+}
+
+
+#chips::-webkit-scrollbar{
+  display:none;
+}
+
+
+.chip{
+
+  flex:0 0 auto;
+
+  padding:8px 14px;
+
+  border-radius:999px;
+
+  border:1px solid var(--line);
+
+  background:rgba(242,233,214,.03);
+
+  color:var(--parchment-dim);
+
+  font-size:12px;
+
+  cursor:pointer;
+
+  white-space:nowrap;
+
+  transition:all .2s ease;
+
+  touch-action:manipulation;
+}
+
+
+.chip.active{
+
+  background:var(--brass);
+
+  border-color:var(--brass);
+
+  color:#1a1204;
+
+  font-weight:600;
+}
+
+
+/* =========================================================
+   FEED
+========================================================= */
+
+/*
+   Le feed prend tout l'écran.
+
+   Chaque article = exactement une page.
+
+   Le scroll est géré directement par le navigateur :
+   - swipe mobile
+   - molette desktop
+   - trackpad
+*/
+
+#feed{
+
+  position:fixed;
+
+  inset:0;
+
+  width:100%;
+  height:100%;
+
+  overflow-y:auto;
+  overflow-x:hidden;
+
+  /*
+    Permet au navigateur de gérer le swipe
+    vertical de manière native.
+  */
+  touch-action:pan-y;
+
+  /*
+    Un article par "page".
+  */
+  scroll-snap-type:y mandatory;
+
+  /*
+    Meilleure sensation sur iOS.
+  */
+  -webkit-overflow-scrolling:touch;
+
+  /*
+    Cache scrollbar.
+  */
+  scrollbar-width:none;
+
+  /*
+    Laisse la place visuelle au header.
+  */
+  scroll-padding-top:var(--topbar-height);
+}
+
+
+#feed::-webkit-scrollbar{
+  display:none;
+}
+
+
+/* =========================================================
+   ENTRY
+========================================================= */
+
+.entry{
+
+  position:relative;
+
+  width:100%;
+
+  min-height:100svh;
+  height:100svh;
+
+  scroll-snap-align:start;
+  scroll-snap-stop:always;
+
+  display:flex;
+
+  align-items:center;
+  justify-content:center;
+
+  padding:
+    calc(var(--topbar-height) + 16px)
+    16px
+    calc(20px + env(safe-area-inset-bottom));
+
+  /*
+    Permet au navigateur de traiter
+    chaque article comme une page.
+  */
+  contain:layout paint;
+}
+
+
+/* =========================================================
+   ARTICLE CARD
+========================================================= */
+
+.entry-inner{
+
+  width:100%;
+
+  max-width:640px;
+
+  max-height:calc(
+    100svh
+    - var(--topbar-height)
+    - 36px
+  );
+
+  display:flex;
+
+  flex-direction:column;
+
+  justify-content:center;
+}
+
+
+/* =========================================================
+   IMAGE
+========================================================= */
+
+.media{
+
+  position:relative;
+
+  width:100%;
+
+  aspect-ratio:4/3;
+
+  max-height:52svh;
+
+  overflow:hidden;
+
+  border-radius:6px 6px 0 0;
+
+  background:var(--ink-2);
+
+  flex-shrink:1;
+}
+
+
+.media .bg{
+
+  position:absolute;
+
+  inset:0;
+
+  background-size:cover;
+
+  background-position:center;
+
+  filter:saturate(.92) brightness(.86);
+
+  transition:
+    transform .6s ease,
+    opacity .4s ease;
+}
+
+
+.entry.active .media .bg{
+
+  transform:scale(1.01);
+}
+
+
+.media .bg.noimg{
+
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(201,162,39,.18),
+      transparent 55%
+    ),
+    repeating-linear-gradient(
+      135deg,
+      rgba(242,233,214,.04) 0 2px,
+      transparent 2px 22px
+    ),
+    var(--ink-2);
+}
+
+
+.catalog-tag{
+
+  position:absolute;
+
+  top:10px;
+  right:10px;
+
+  z-index:5;
+
+  font-size:10.5px;
+
+  color:var(--brass);
+
+  background:rgba(18,21,28,.65);
+
+  border:1px solid var(--line);
+
+  padding:4px 9px;
+
+  border-radius:3px;
+
+  transform:rotate(2deg);
+}
+
+
+/* =========================================================
+   CONTENT
+========================================================= */
+
+.content{
+
+  position:relative;
+
+  z-index:2;
+
+  width:100%;
+
+  background:var(--parchment);
+
+  color:#1a1a12;
+
+  padding:16px 20px 16px;
+
+  border-radius:0 0 6px 6px;
+
+  border-top:2px dashed rgba(26,26,18,.22);
+
+  box-shadow:
+    0 10px 22px rgba(0,0,0,.35);
+
+  overflow:hidden;
+}
+
+
+.eyebrow{
+
+  font-size:10px;
+
+  text-transform:uppercase;
+
+  color:var(--brass-dim);
+
+  margin:0 0 6px;
+
+  letter-spacing:.08em;
+
+  white-space:nowrap;
+
+  overflow:hidden;
+
+  text-overflow:ellipsis;
+}
+
+
+.title{
+
+  font-family:'Fraunces', serif;
+
+  font-weight:700;
+
+  font-size:clamp(
+    21px,
+    5.4vw,
+    27px
+  );
+
+  line-height:1.14;
+
+  margin:0 0 8px;
+
+  letter-spacing:-.01em;
+}
+
+
+.extract{
+
+  font-size:15px;
+
+  line-height:1.52;
+
+  margin:0;
+
+  color:#2b2818;
+
+  display:-webkit-box;
+
+  -webkit-box-orient:vertical;
+
+  -webkit-line-clamp:5;
+
+  overflow:hidden;
+}
+
+
+/* =========================================================
+   META
+========================================================= */
+
+.meta-row{
+
+  display:flex;
+
+  align-items:center;
+
+  gap:14px;
+
+  margin-top:11px;
+
+  flex-wrap:wrap;
+}
+
+
+.read-link{
+
+  font-size:12px;
+
+  color:var(--rose);
+
+  text-decoration:none;
+
+  border-bottom:1px solid currentColor;
+
+  font-weight:600;
+}
+
+
+.read-time{
+
+  font-size:11px;
+
+  color:var(--brass-dim);
+}
+
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+
+.actions{
+
+  display:flex;
+
+  gap:8px;
+
+  margin-top:12px;
+
+  padding-top:11px;
+
+  border-top:1px solid rgba(26,26,18,.14);
+}
+
+
+.actions button{
+
+  flex:1;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  gap:6px;
+
+  padding:8px;
+
+  border-radius:5px;
+
+  border:1px solid rgba(26,26,18,.18);
+
+  background:transparent;
+
+  color:#1a1a12;
+
+  font-size:12px;
+
+  cursor:pointer;
+
+  font-family:'IBM Plex Mono', monospace;
+
+  touch-action:manipulation;
+
+  transition:
+    transform .12s ease,
+    opacity .2s ease;
+}
+
+
+.actions button:active{
+
+  transform:scale(.96);
+}
+
+
+/* =========================================================
+   LOADING PAGE
+========================================================= */
+
+.loading-card{
+
+  width:100%;
+
+  height:100svh;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  flex-direction:column;
+
+  gap:10px;
+
+  color:var(--brass-dim);
+
+  font-size:12px;
+
+  scroll-snap-align:start;
+}
+
+
+.spinner{
+
+  width:24px;
+  height:24px;
+
+  border-radius:50%;
+
+  border:2px solid var(--line);
+
+  border-top-color:var(--brass);
+
+  animation:spin .8s linear infinite;
+}
+
+
+@keyframes spin{
+
+  to{
+    transform:rotate(360deg);
+  }
+
+}
+
+
+/* =========================================================
+   SWIPE INDICATOR
+========================================================= */
+
+#swipe-hint{
+
+  position:fixed;
+
+  z-index:70;
+
+  left:50%;
+
+  bottom:
+    calc(
+      14px +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:translateX(-50%);
+
+  display:flex;
+
+  flex-direction:column;
+
+  align-items:center;
+
+  gap:4px;
+
+  color:var(--parchment-dim);
+
+  font-family:'IBM Plex Mono', monospace;
+
+  font-size:9px;
+
+  letter-spacing:.08em;
+
+  pointer-events:none;
+
+  opacity:.75;
+
+  transition:
+    opacity .5s ease,
+    transform .5s ease;
+}
+
+
+#swipe-hint .arrow{
+
+  font-size:18px;
+
+  animation:swipeArrow 1.5s ease-in-out infinite;
+}
+
+
+#swipe-hint.hidden{
+
+  opacity:0;
+
+  transform:
+    translateX(-50%)
+    translateY(10px);
+}
+
+
+@keyframes swipeArrow{
+
+  0%,
+  100%{
+    transform:translateY(0);
+    opacity:.5;
+  }
+
+  50%{
+    transform:translateY(5px);
+    opacity:1;
+  }
+
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+#toast{
+
+  position:fixed;
+
+  left:50%;
+
+  bottom:
+    calc(
+      20px +
+      env(safe-area-inset-bottom)
+    );
+
+  transform:
+    translateX(-50%)
+    translateY(20px);
+
+  background:var(--parchment);
+
+  color:#1a1a12;
+
+  padding:9px 16px;
+
+  border-radius:4px;
+
+  font-size:12.5px;
+
+  z-index:90;
+
+  opacity:0;
+
+  pointer-events:none;
+
+  transition:all .25s ease;
+
+  max-width:86vw;
+
+  text-align:center;
+}
+
+
+#toast.show{
+
+  opacity:1;
+
+  transform:
+    translateX(-50%)
+    translateY(0);
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media(max-width:700px){
+
+  :root{
+    --topbar-height:112px;
+  }
+
+
+  #brand .sub{
+    display:none;
+  }
+
+
+  .entry{
+
+    padding:
+      calc(var(--topbar-height) + 8px)
+      12px
+      calc(32px + env(safe-area-inset-bottom));
+  }
+
+
+  .entry-inner{
+
+    max-height:
+      calc(
+        100svh
+        - var(--topbar-height)
+        - 40px
+      );
+  }
+
+
+  .media{
+
+    aspect-ratio:4/3;
+
+    max-height:48svh;
+  }
+
+
+  .content{
+
+    padding:
+      14px 16px 15px;
+  }
+
+
+  .extract{
+
+    font-size:14.5px;
+
+    line-height:1.5;
+
+    -webkit-line-clamp:4;
+  }
+
+
+  .title{
+
+    font-size:24px;
+  }
+
+
+  /*
+    Le hint est plus visible sur mobile.
+  */
+
+  #swipe-hint{
+    display:flex;
+  }
+
+}
+
+
+/* =========================================================
+   DESKTOP
+========================================================= */
+
+@media(min-width:701px){
+
+  #swipe-hint{
+    display:none;
+  }
+
+
+  /*
+    Sur desktop, on laisse un peu plus d'espace.
+  */
+
+  .entry{
+
+    padding:
+      calc(var(--topbar-height) + 20px)
+      24px
+      24px;
+  }
+
+
+  .media{
+
+    max-height:50svh;
+  }
+
+
+  /*
+    Molette = un article à la fois.
+  */
+
+  #feed{
+    scroll-snap-type:y mandatory;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL HEIGHT DEVICES
+========================================================= */
+
+@media(max-height:700px){
+
+  :root{
+    --topbar-height:104px;
+  }
+
+
+  .entry{
+
+    padding-top:
+      calc(var(--topbar-height) + 6px);
+
+    padding-bottom:12px;
+  }
+
+
+  .media{
+
+    max-height:43svh;
+  }
+
+
+  .content{
+
+    padding:
+      11px 15px 12px;
+  }
+
+
+  .extract{
+
+    -webkit-line-clamp:3;
+
+    font-size:13.5px;
+  }
+
+
+  .actions{
+
+    margin-top:8px;
+
+    padding-top:8px;
+  }
+
+}
+
+</style>
+</head>
+
+
+<body>
+
+
+<!-- =======================================================
+     GRAIN
+======================================================== -->
+
+<div id="grain"></div>
+
+
+<!-- =======================================================
+     TOP BAR
+======================================================== -->
+
+<div id="topbar">
+
+  <div id="brand-row">
+
+    <div id="brand">
+
+      <span class="mark">
+        WikiScroll
+      </span>
+
+      <span
+        class="sub mono"
+        id="brand-sub"
+      >
+        le hasard encyclopédique
+      </span>
+
+    </div>
+
+
+    <div
+      id="langswitch"
+      class="mono"
+    >
+
+      <button
+        data-lang="fr"
+        class="active"
+      >
+        FR
+      </button>
+
+      <button
+        data-lang="en"
+      >
+        EN
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div
+    id="chips"
+    class="mono"
+  ></div>
+
+</div>
+
+
+<!-- =======================================================
+     FEED
+======================================================== -->
+
+<div id="feed"></div>
+
+
+<!-- =======================================================
+     SWIPE HINT
+======================================================== -->
+
+<div id="swipe-hint">
+
+  <div class="arrow">
+    ↓
+  </div>
+
+  <div>
+    SWIPE
+  </div>
+
+</div>
+
+
+<!-- =======================================================
+     TOAST
+======================================================== -->
+
+<div id="toast"></div>
+
+
+<script>
+
+(function(){
+
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+
+/*
+ * Nombre d'articles préchargés.
+ *
+ * On en charge 2 :
+ *
+ * Article visible
+ * Article suivant
+ *
+ * Cela évite de montrer un écran vide.
+ */
+
+const PRELOAD_COUNT = 2;
+
+
+/*
+ * Distance approximative à laquelle
+ * on prépare le prochain article.
+ */
+
+const LOAD_AHEAD = 1;
+
+
+/* =========================================================
+   STRINGS
+========================================================= */
+
+const STRINGS = {
+
+  fr: {
+
+    sub:'le hasard encyclopédique',
+
+    loading:'chargement de la fiche…',
+
+    notFound:'aucune fiche trouvée, réessayez',
+
+    readLink:"Lire l'article entier",
+
+    readTime:n =>
+      n + ' min de lecture',
+
+    reroll:'⟳ Autre',
+
+    share:'↗ Copier',
+
+    copied:'Lien copié',
+
+  },
+
+
+  en: {
+
+    sub:'the encyclopedic randomizer',
+
+    loading:'loading entry…',
+
+    notFound:'no entry found, try again',
+
+    readLink:'Read the full article',
+
+    readTime:n =>
+      n + ' min read',
+
+    reroll:'⟳ Another',
+
+    share:'↗ Copy',
+
+    copied:'Link copied',
+
+  }
+
+};
+
+
+/* =========================================================
+   TOPICS
+========================================================= */
+
+const TOPICS = [
+
+  {
+    fr:'Aléatoire',
+    en:'Random',
+    q:{
+      fr:null,
+      en:null
+    }
+  },
+
+  {
+    fr:'Science',
+    en:'Science',
+    q:{
+      fr:'science',
+      en:'science'
+    }
+  },
+
+  {
+    fr:'Histoire',
+    en:'History',
+    q:{
+      fr:'histoire',
+      en:'history'
+    }
+  },
+
+  {
+    fr:'Art',
+    en:'Art',
+    q:{
+      fr:'art peinture sculpture',
+      en:'art painting sculpture'
+    }
+  },
+
+  {
+    fr:'Géographie',
+    en:'Geography',
+    q:{
+      fr:'géographie ville pays',
+      en:'geography city country'
+    }
+  },
+
+  {
+    fr:'Nature',
+    en:'Nature',
+    q:{
+      fr:'nature animal espèce',
+      en:'nature animal species'
+    }
+  },
+
+  {
+    fr:'Techno',
+    en:'Tech',
+    q:{
+      fr:'technologie informatique',
+      en:'technology computing'
+    }
+  },
+
+  {
+    fr:'Musique',
+    en:'Music',
+    q:{
+      fr:'musique',
+      en:'music'
+    }
+  },
+
+  {
+    fr:'Cinéma',
+    en:'Film',
+    q:{
+      fr:'cinéma film',
+      en:'cinema film'
+    }
+  },
+
+  {
+    fr:'Philosophie',
+    en:'Philosophy',
+    q:{
+      fr:'philosophie',
+      en:'philosophy'
+    }
+  },
+
+  {
+    fr:'Sport',
+    en:'Sport',
+    q:{
+      fr:'sport',
+      en:'sport'
+    }
+  }
+
+];
+
+
+/* =========================================================
+   DOM
+========================================================= */
+
+const feedEl =
+  document.getElementById('feed');
+
+const chipsEl =
+  document.getElementById('chips');
+
+const toastEl =
+  document.getElementById('toast');
+
+const brandSubEl =
+  document.getElementById('brand-sub');
+
+const swipeHintEl =
+  document.getElementById('swipe-hint');
+
+const langBtns =
+  document.querySelectorAll(
+    '#langswitch button'
+  );
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let LANG = 'fr';
+
+let currentTopic =
+  TOPICS[0];
+
+
+/*
+ * Articles déjà affichés.
+ */
+
+let seen = new Set();
+
+
+/*
+ * Empêche plusieurs chargements
+ * simultanés.
+ */
+
+let loading = false;
+
+
+/*
+ * Permet d'invalider les anciennes
+ * requêtes lorsqu'on change de catégorie
+ * ou de langue.
+ */
+
+let requestToken = 0;
+
+
+/*
+ * Index de l'article actuellement affiché.
+ */
+
+let currentIndex = 0;
+
+
+/*
+ * Cache local des articles déjà construits.
+ */
+
+let entries = [];
+
+
+/* =========================================================
+   TRANSLATION
+========================================================= */
+
+function t(){
+
+  return STRINGS[LANG];
+
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+function showToast(msg){
+
+  toastEl.textContent = msg;
+
+  toastEl.classList.add('show');
+
+  clearTimeout(showToast._t);
+
+  showToast._t =
+    setTimeout(() => {
+
+      toastEl.classList.remove(
+        'show'
+      );
+
+    },1600);
+
+}
+
+
+/* =========================================================
+   READ TIME
+========================================================= */
+
+function readTimeStr(article){
+
+  const words =
+    (article.extract || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .length;
+
+  return t().readTime(
+    Math.max(
+      1,
+      Math.round(words / 200)
+    )
+  );
+
+}
+
+
+/* =========================================================
+   FETCH JSON
+========================================================= */
+
+async function fetchJSON(url){
+
+  const res =
+    await fetch(url);
+
+  if(!res.ok){
+
+    throw new Error(
+      'http ' + res.status
+    );
+
+  }
+
+  return res.json();
+
+}
+
+
+/* =========================================================
+   RANDOM ARTICLE
+========================================================= */
+
+async function fetchRandomSummary(){
+
+  return fetchJSON(
+    `https://${LANG}.wikipedia.org/api/rest_v1/page/random/summary`
+  );
+
+}
+
+
+/* =========================================================
+   ARTICLE SUMMARY
+========================================================= */
+
+async function fetchSummaryFor(title){
+
+  return fetchJSON(
+    `https://${LANG}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+  );
+
+}
+
+
+/* =========================================================
+   TOPIC SEARCH
+========================================================= */
+
+async function fetchByTopic(q){
+
+  const offset =
+    Math.floor(
+      Math.random() * 180
+    );
+
+
+  const url =
+    `https://${LANG}.wikipedia.org/w/api.php` +
+    `?action=query` +
+    `&list=search` +
+    `&srsearch=${encodeURIComponent(q)}` +
+    `&format=json` +
+    `&origin=*` +
+    `&srlimit=25` +
+    `&sroffset=${offset}` +
+    `&srnamespace=0`;
+
+
+  const data =
+    await fetchJSON(url);
+
+
+  const results =
+    (
+      data.query &&
+      data.query.search
+    ) || [];
+
+
+  if(!results.length){
+
+    return fetchRandomSummary();
+
+  }
+
+
+  const pick =
+    results[
+      Math.floor(
+        Math.random() *
+        results.length
+      )
+    ];
+
+
+  return fetchSummaryFor(
+    pick.title
+  );
+
+}
+
+
+/* =========================================================
+   NEXT ARTICLE
+========================================================= */
+
+async function getNextArticle(){
+
+  for(
+    let attempt = 0;
+    attempt < 6;
+    attempt++
+  ){
+
+    try{
+
+      const q =
+        currentTopic.q[LANG];
+
+
+      const summary =
+        q
+          ? await fetchByTopic(q)
+          : await fetchRandomSummary();
+
+
+      if(!summary){
+        continue;
+      }
+
+
+      if(
+        summary.type ===
+        'disambiguation'
+      ){
+        continue;
+      }
+
+
+      if(
+        !summary.extract ||
+        summary.extract.length < 40
+      ){
+        continue;
+      }
+
+
+      if(
+        seen.has(
+          summary.pageid
+        )
+      ){
+        continue;
+      }
+
+
+      seen.add(
+        summary.pageid
+      );
+
+
+      /*
+       * Pas de fetchWordCount ici.
+       *
+       * On économise une requête.
+       */
+
+      return summary;
+
+    }
+    catch(e){
+
+      console.warn(
+        'Wikipedia error:',
+        e
+      );
+
+    }
+
+  }
+
+
+  return null;
+
+}
+
+
+/* =========================================================
+   CATALOG NUMBER
+========================================================= */
+
+function catalogNumber(pageid){
+
+  return (
+    'N° ' +
+    String(pageid)
+      .padStart(6,'0')
+  );
+
+}
+
+
+/* =========================================================
+   BUILD ENTRY
+========================================================= */
+
+function buildEntry(article){
+
+  const entry =
+    document.createElement(
+      'article'
+    );
+
+
+  entry.className =
+    'entry';
+
+
+  /*
+   * Loading page
+   */
+
+  if(!article){
+
+    entry.innerHTML = `
+
+      <div class="loading-card">
+
+        <div class="spinner"></div>
+
+        <div class="mono">
+          ${t().loading}
+        </div>
+
+      </div>
+
+    `;
+
+    return entry;
+
+  }
+
+
+  /* =======================================================
+     IMAGE
+  ======================================================= */
+
+  const img =
+    article.thumbnail
+      ? article.thumbnail.source
+      : (
+          article.originalimage
+            ? article.originalimage.source
+            : null
+        );
+
+
+  /* =======================================================
+     URL
+  ======================================================= */
+
+  const pageUrl =
+    (
+      article.content_urls &&
+      article.content_urls.desktop &&
+      article.content_urls.desktop.page
+    )
+    ||
+    `https://${LANG}.wikipedia.org/?curid=${article.pageid}`;
+
+
+  /* =======================================================
+     DESCRIPTION
+  ======================================================= */
+
+  const desc =
+    article.description
+      ? article.description
+      : currentTopic[LANG];
+
+
+  /* =======================================================
+     HTML
+  ======================================================= */
+
+  entry.innerHTML = `
+
+    <div class="entry-inner">
+
+      <div class="media">
+
+        <div
+          class="bg ${img ? '' : 'noimg'}"
+          ${
+            img
+              ? `style="background-image:url('${img}')"`
+              : ''
+          }
+        ></div>
+
+        <div class="catalog-tag mono">
+
+          ${catalogNumber(
+            article.pageid
+          )}
+
+        </div>
+
+      </div>
+
+
+      <div class="content">
+
+        <p class="eyebrow mono">
+
+          ${desc}
+
+          ·
+
+          ${LANG.toUpperCase()}
+
+        </p>
+
+
+        <h2 class="title">
+
+          ${article.title}
+
+        </h2>
+
+
+        <p class="extract">
+
+          ${article.extract}
+
+        </p>
+
+
+        <div class="meta-row">
+
+          <a
+            class="read-link"
+            href="${pageUrl}"
+            target="_blank"
+            rel="noopener"
+          >
+
+            ${t().readLink}
+
+          </a>
+
+
+          <span class="read-time mono">
+
+            ${readTimeStr(article)}
+
+          </span>
+
+        </div>
+
+
+        <div class="actions">
+
+          <button class="reroll-btn">
+
+            ${t().reroll}
+
+          </button>
+
+
+          <button class="share-btn">
+
+            ${t().share}
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  `;
+
+
+  /* =======================================================
+     REROLL
+  ======================================================= */
+
+  const rerollBtn =
+    entry.querySelector(
+      '.reroll-btn'
+    );
+
+
+  rerollBtn.addEventListener(
+    'click',
+    async () => {
+
+      if(rerollBtn.disabled){
+        return;
+      }
+
+
+      rerollBtn.disabled =
+        true;
+
+      rerollBtn.style.opacity =
+        '.4';
+
+
+      try{
+
+        const fresh =
+          await getNextArticle();
+
+
+        if(fresh){
+
+          const freshEntry =
+            buildEntry(fresh);
+
+
+          /*
+           * Remplace uniquement
+           * l'article actuel.
+           */
+
+          entry.replaceWith(
+            freshEntry
+          );
+
+
+          /*
+           * Met à jour le tableau.
+           */
+
+          const index =
+            entries.indexOf(
+              entry
+            );
+
+
+          if(index !== -1){
+
+            entries[index] =
+              freshEntry;
+
+          }
+
+        }
+
+      }
+      finally{
+
+        rerollBtn.disabled =
+          false;
+
+        rerollBtn.style.opacity =
+          '1';
+
+      }
+
+    }
+  );
+
+
+  /* =======================================================
+     SHARE
+  ======================================================= */
+
+  const shareBtn =
+    entry.querySelector(
+      '.share-btn'
+    );
+
+
+  shareBtn.addEventListener(
+    'click',
+    async () => {
+
+      try{
+
+        await navigator.clipboard.writeText(
+          pageUrl
+        );
+
+        showToast(
+          t().copied
+        );
+
+      }
+      catch(e){
+
+        showToast(
+          pageUrl
+        );
+
+      }
+
+    }
+  );
+
+
+  return entry;
+
+}
+
+
+/* =========================================================
+   APPEND ONE ARTICLE
+========================================================= */
+
+async function appendArticle(
+  myToken
+){
+
+  if(
+    myToken !==
+    requestToken
+  ){
+    return false;
+  }
+
+
+  const article =
+    await getNextArticle();
+
+
+  if(
+    myToken !==
+    requestToken
+  ){
+    return false;
+  }
+
+
+  if(!article){
+
+    return false;
+
+  }
+
+
+  const entry =
+    buildEntry(article);
+
+
+  feedEl.appendChild(
+    entry
+  );
+
+
+  entries.push(
+    entry
+  );
+
+
+  return true;
+
+}
+
+
+/* =========================================================
+   LOAD NEXT ARTICLES
+========================================================= */
+
+async function loadMore(){
+
+  if(loading){
+    return;
+  }
+
+
+  loading = true;
+
+
+  const myToken =
+    requestToken;
+
+
+  try{
+
+    /*
+     * On charge 2 articles.
+     *
+     * L'article visible + le suivant.
+     */
+
+    for(
+      let i = 0;
+      i < PRELOAD_COUNT;
+      i++
+    ){
+
+      if(
+        myToken !==
+        requestToken
+      ){
+        return;
+      }
+
+
+      await appendArticle(
+        myToken
+      );
+
+    }
+
+  }
+  catch(e){
+
+    console.error(
+      'Erreur de chargement:',
+      e
+    );
+
+  }
+  finally{
+
+    loading = false;
+
+  }
+
+}
+
+
+/* =========================================================
+   CURRENT ARTICLE DETECTION
+========================================================= */
+
+function updateCurrentArticle(){
+
+  if(!entries.length){
+    return;
+  }
+
+
+  let closestIndex = 0;
+
+  let closestDistance =
+    Infinity;
+
+
+  const viewportCenter =
+    feedEl.scrollTop +
+    (
+      feedEl.clientHeight / 2
+    );
+
+
+  entries.forEach(
+    (entry,index) => {
+
+      const center =
+        entry.offsetTop +
+        (
+          entry.offsetHeight / 2
+        );
+
+
+      const distance =
+        Math.abs(
+          center -
+          viewportCenter
+        );
+
+
+      if(
+        distance <
+        closestDistance
+      ){
+
+        closestDistance =
+          distance;
+
+        closestIndex =
+          index;
+
+      }
+
+    }
+  );
+
+
+  if(
+    closestIndex !==
+    currentIndex
+  ){
+
+    currentIndex =
+      closestIndex;
+
+
+    /*
+     * L'utilisateur est arrivé
+     * sur un nouvel article.
+     *
+     * On précharge le suivant.
+     */
+
+    if(
+      currentIndex >=
+      entries.length - LOAD_AHEAD
+    ){
+
+      loadMore();
+
+    }
+
+
+    /*
+     * Cache le hint après
+     * le premier swipe.
+     */
+
+    if(currentIndex > 0){
+
+      swipeHintEl.classList.add(
+        'hidden'
+      );
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   SCROLL HANDLER
+========================================================= */
+
+let scrollTicking = false;
+
+
+feedEl.addEventListener(
+  'scroll',
+  () => {
+
+    if(scrollTicking){
+      return;
+    }
+
+
+    scrollTicking = true;
+
+
+    requestAnimationFrame(
+      () => {
+
+        updateCurrentArticle();
+
+        scrollTicking =
+          false;
+
+      }
+    );
+
+  },
+  {
+    passive:true
+  }
+);
+
+
+/* =========================================================
+   TOPIC CHIPS
+========================================================= */
+
+function renderChips(){
+
+  chipsEl.innerHTML =
+    '';
+
+
+  TOPICS.forEach(
+    topic => {
+
+      const chip =
+        document.createElement(
+          'div'
+        );
+
+
+      chip.className =
+        'chip' +
+        (
+          topic ===
+          currentTopic
+            ? ' active'
+            : ''
+        );
+
+
+      chip.textContent =
+        topic[LANG];
+
+
+      chip.addEventListener(
+        'click',
+        () => {
+
+          if(
+            topic ===
+            currentTopic
+          ){
+
+            return;
+
+          }
+
+
+          currentTopic =
+            topic;
+
+
+          renderChips();
+
+
+          resetFeed();
+
+        }
+      );
+
+
+      chipsEl.appendChild(
+        chip
+      );
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   LANGUAGE
+========================================================= */
+
+langBtns.forEach(
+  btn => {
+
+    btn.addEventListener(
+      'click',
+      () => {
+
+        const lang =
+          btn.dataset.lang;
+
+
+        if(lang === LANG){
+          return;
+        }
+
+
+        LANG =
+          lang;
+
+
+        langBtns.forEach(
+          b => {
+
+            b.classList.toggle(
+              'active',
+              b === btn
+            );
+
+          }
+        );
+
+
+        document.documentElement.lang =
+          LANG;
+
+
+        brandSubEl.textContent =
+          t().sub;
+
+
+        renderChips();
+
+
+        resetFeed();
+
+      }
+    );
+
+  }
+);
+
+
+/* =========================================================
+   RESET FEED
+========================================================= */
+
+async function resetFeed(){
+
+  /*
+   * Invalide toutes les anciennes requêtes.
+   */
+
+  requestToken++;
+
+
+  /*
+   * Reset state.
+   */
+
+  seen =
+    new Set();
+
+
+  entries =
+    [];
+
+
+  currentIndex =
+    0;
+
+
+  /*
+   * Reset UI.
+   */
+
+  feedEl.innerHTML =
+    '';
+
+
+  /*
+   * Retour au premier article.
+   */
+
+  feedEl.scrollTo({
+    top:0,
+    behavior:'instant'
+  });
+
+
+  /*
+   * Charge immédiatement
+   * les deux premiers articles.
+   */
+
+  await loadMore();
+
+
+  /*
+   * Affiche à nouveau le hint.
+   */
+
+  swipeHintEl.classList.remove(
+    'hidden'
+  );
+
+}
+
+
+/* =========================================================
+   TOUCH SWIPE ENHANCEMENT
+========================================================= */
+
+/*
+ * Le navigateur gère déjà le swipe.
+ *
+ * On ajoute simplement une petite logique pour
+ * rendre les gros swipes plus prévisibles.
+ */
+
+let touchStartY = 0;
+let touchStartTime = 0;
+
+
+feedEl.addEventListener(
+  'touchstart',
+  event => {
+
+    if(
+      event.touches.length !== 1
+    ){
+      return;
+    }
+
+
+    touchStartY =
+      event.touches[0].clientY;
+
+
+    touchStartTime =
+      Date.now();
+
+  },
+  {
+    passive:true
+  }
+);
+
+
+feedEl.addEventListener(
+  'touchend',
+  event => {
+
+    if(
+      event.changedTouches.length !== 1
+    ){
+      return;
+    }
+
+
+    const endY =
+      event.changedTouches[0].clientY;
+
+
+    const deltaY =
+      endY -
+      touchStartY;
+
+
+    const elapsed =
+      Date.now() -
+      touchStartTime;
+
+
+    /*
+     * Swipe suffisamment important.
+     */
+
+    const isSwipe =
+      Math.abs(deltaY) > 50 &&
+      elapsed < 700;
+
+
+    if(!isSwipe){
+      return;
+    }
+
+
+    /*
+     * Si le navigateur n'a pas encore
+     * terminé son scroll snap, on le force
+     * vers l'article suivant/précédent.
+     */
+
+    if(deltaY < 0){
+
+      goToArticle(
+        currentIndex + 1
+      );
+
+    }
+    else{
+
+      goToArticle(
+        currentIndex - 1
+      );
+
+    }
+
+  },
+  {
+    passive:true
+  }
+);
+
+
+/* =========================================================
+   GO TO ARTICLE
+========================================================= */
+
+function goToArticle(index){
+
+  if(!entries.length){
+    return;
+  }
+
+
+  const targetIndex =
+    Math.max(
+      0,
+      Math.min(
+        index,
+        entries.length - 1
+      )
+    );
+
+
+  const target =
+    entries[targetIndex];
+
+
+  if(!target){
+    return;
+  }
+
+
+  target.scrollIntoView({
+    behavior:'smooth',
+    block:'start'
+  });
+
+
+  /*
+   * Précharge immédiatement si on
+   * arrive proche de la fin.
+   */
+
+  if(
+    targetIndex >=
+    entries.length - LOAD_AHEAD
+  ){
+
+    loadMore();
+
+  }
+
+}
+
+
+/* =========================================================
+   KEYBOARD SUPPORT
+========================================================= */
+
+window.addEventListener(
+  'keydown',
+  event => {
+
+    /*
+     * Ne pas intercepter les touches
+     * quand un bouton ou lien est actif.
+     */
+
+    if(
+      event.target.tagName ===
+      'BUTTON' ||
+      event.target.tagName ===
+      'A'
+    ){
+      return;
+    }
+
+
+    if(
+      event.key === 'ArrowDown' ||
+      event.key === 'PageDown'
+    ){
+
+      event.preventDefault();
+
+      goToArticle(
+        currentIndex + 1
+      );
+
+    }
+
+
+    if(
+      event.key === 'ArrowUp' ||
+      event.key === 'PageUp'
+    ){
+
+      event.preventDefault();
+
+      goToArticle(
+        currentIndex - 1
+      );
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
+renderChips();
+
+resetFeed();
+
+
+})();
+
+</script>
+
+</body>
+</html>
